@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "ChatGPT Exporter",
+  "version": "1.0",
+  "description": "Export the current ChatGPT conversation to a Markdown file.",
+  "permissions": ["scripting", "activeTab", "contextMenus"],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "host_permissions": ["https://chatgpt.com/*"]
+}
