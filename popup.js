@@ -9,7 +9,6 @@ document.getElementById('mdBtn').addEventListener('click', () => {
 
 function exportChatGPTMarkdown() {
   function escapeMarkdown(text) {
-    // 转义 Markdown 特殊字符
     return text.replace(/([\\`*_[\]<>~])/g, '\\$1');
   }
 
@@ -20,73 +19,61 @@ function exportChatGPTMarkdown() {
     const newlineTags = new Set(['BR', 'TR', 'HR']);
     const listTags = new Set(['UL', 'OL']);
     const tableTags = new Set(['TABLE', 'THEAD', 'TBODY', 'TR']);
-    
-    // 文本节点
+
     if (el.nodeType === Node.TEXT_NODE) {
       return escapeMarkdown(el.textContent);
     }
 
-    // 代码块单独处理
     if (el.tagName === 'PRE') {
       const codeEl = el.querySelector('code');
       if (codeEl) {
         const langClass = [...codeEl.classList].find(c => c.startsWith('language-')) || '';
         const lang = langClass.replace('language-', '');
-        const codeText = codeEl.textContent;
+        const codeText = codeEl.textContent.trim();
         return `\n\`\`\`${lang}\n${codeText}\n\`\`\`\n`;
       } else {
-        // 没有code标签的pre，直接输出文本
-        return `\n\`\`\`\n${el.textContent}\n\`\`\`\n`;
+        return `\n\`\`\`\n${el.textContent.trim()}\n\`\`\`\n`;
       }
     }
 
-    // 粗体
     if (el.tagName === 'STRONG' || el.tagName === 'B') {
       return `**${Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('')}**`;
     }
 
-    // 斜体
     if (el.tagName === 'EM' || el.tagName === 'I') {
       return `*${Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('')}*`;
     }
 
-    // 删除线
     if (el.tagName === 'DEL' || el.tagName === 'S' || el.tagName === 'STRIKE') {
       return `~~${Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('')}~~`;
     }
 
-    // 链接
     if (el.tagName === 'A') {
       const href = el.getAttribute('href') || '';
       const title = Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('');
       return `[${title}](${href})`;
     }
 
-    // 图片
     if (el.tagName === 'IMG') {
       const alt = el.getAttribute('alt') || '';
       const src = el.getAttribute('src') || '';
       return `![${alt}](${src})`;
     }
 
-    // 换行
     if (el.tagName === 'BR') {
       return '  \n';
     }
 
-    // 水平线
     if (el.tagName === 'HR') {
       return '\n---\n';
     }
 
-    // 引用块
     if (el.tagName === 'BLOCKQUOTE') {
-      const quoteContent = Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('');
+      const quoteContent = Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('').trim();
       const quoted = quoteContent.split('\n').map(line => line ? '> ' + line : '> ').join('\n');
       return `\n${quoted}\n`;
     }
 
-    // 列表
     if (el.tagName === 'UL' || el.tagName === 'OL') {
       let markdown = '\n';
       let index = 1;
@@ -94,32 +81,27 @@ function exportChatGPTMarkdown() {
         if (li.tagName !== 'LI') return;
 
         const indent = '  '.repeat(listLevel);
-        let prefix = el.tagName === 'UL' ? '- ' : `${index}. `;
+        const prefix = el.tagName === 'UL' ? '- ' : `${index}. `;
         index++;
 
-        const liContent = Array.from(li.childNodes).map(child => htmlToMarkdown(child, listLevel + 1)).join('');
-
-        // 多行列表项要缩进换行
-        let liText = liContent.replace(/\n/g, '\n' + indent + '  ');
+        const liContent = Array.from(li.childNodes).map(child => htmlToMarkdown(child, listLevel + 1)).join('').trim();
+        const liText = liContent.replace(/\n/g, '\n' + indent + '  ');
 
         markdown += indent + prefix + liText + '\n';
       });
       return markdown + '\n';
     }
 
-    // 表格处理
     if (el.tagName === 'TABLE') {
       const rows = Array.from(el.querySelectorAll('tr'));
       if (rows.length === 0) return '';
 
-      // 取第一行为表头
       const headers = Array.from(rows[0].querySelectorAll('th,td')).map(th => htmlToMarkdown(th, listLevel).trim());
       const aligns = headers.map(() => '---');
 
       let mdTable = '\n| ' + headers.join(' | ') + ' |\n';
       mdTable += '| ' + aligns.join(' | ') + ' |\n';
 
-      // 后续为表格内容行
       for (let i = 1; i < rows.length; i++) {
         const cols = Array.from(rows[i].querySelectorAll('td,th')).map(td => htmlToMarkdown(td, listLevel).trim());
         mdTable += '| ' + cols.join(' | ') + ' |\n';
@@ -127,13 +109,11 @@ function exportChatGPTMarkdown() {
       return mdTable + '\n';
     }
 
-    // 块级元素换行处理
     if (blockTags.has(el.tagName)) {
-      const inner = Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('');
-      return inner + '\n\n';
+      const inner = Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('').trim();
+      return inner + '\n';
     }
 
-    // 默认递归处理所有子节点
     return Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('');
   }
 
@@ -145,7 +125,6 @@ function exportChatGPTMarkdown() {
       const role = msg.getAttribute('data-message-author-role');
       const prefix = role === 'user' ? '### User' : '### ChatGPT';
 
-      // 选择不同内容容器，用户一般在.whitespace-pre-wrap，AI一般在.markdown.prose
       let contentEl = null;
       if (role === 'user') {
         contentEl = msg.querySelector('.whitespace-pre-wrap');
@@ -155,12 +134,13 @@ function exportChatGPTMarkdown() {
 
       if (!contentEl) return;
 
-      const markdown = htmlToMarkdown(contentEl);
-
-      result += `${prefix} Message ${index + 1}\n\n${markdown}\n---\n\n`;
+      const markdown = htmlToMarkdown(contentEl).trim();
+      result += `${prefix} Message ${index + 1}\n\n${markdown}\n\n---\n\n`;
     });
 
-    return result || 'No conversation content found.';
+    result = result.replace(/[ \t]+\n/g, '\n');      // 去掉行尾多余空格
+    result = result.replace(/\n{3,}/g, '\n\n');       // 合并多个空行为两个
+    return result.trim();
   }
 
   const content = getContent();

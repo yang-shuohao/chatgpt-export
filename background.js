@@ -25,106 +25,89 @@ function exportChatGPTMarkdown() {
     if (!el) return '';
 
     const blockTags = new Set(['P', 'DIV', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'MAIN']);
-    const newlineTags = new Set(['BR', 'TR', 'HR']);
-    const listTags = new Set(['UL', 'OL']);
     const tableTags = new Set(['TABLE', 'THEAD', 'TBODY', 'TR']);
 
     if (el.nodeType === Node.TEXT_NODE) {
-      return escapeMarkdown(el.textContent);
+      return escapeMarkdown(el.textContent.trim());
     }
 
-    if (el.tagName === 'PRE') {
+    const tag = el.tagName;
+
+    if (tag === 'PRE') {
       const codeEl = el.querySelector('code');
-      if (codeEl) {
-        const langClass = [...codeEl.classList].find(c => c.startsWith('language-')) || '';
-        const lang = langClass.replace('language-', '');
-        const codeText = codeEl.textContent;
-        return `\n\`\`\`${lang}\n${codeText}\n\`\`\`\n`;
-      } else {
-        return `\n\`\`\`\n${el.textContent}\n\`\`\`\n`;
-      }
+      const codeText = codeEl ? codeEl.textContent : el.textContent;
+      const langClass = codeEl ? [...codeEl.classList].find(c => c.startsWith('language-')) : '';
+      const lang = langClass ? langClass.replace('language-', '') : '';
+      return `\n\`\`\`${lang}\n${codeText.trim()}\n\`\`\`\n`;
     }
 
-    if (el.tagName === 'STRONG' || el.tagName === 'B') {
-      return `**${Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('')}**`;
+    if (tag === 'STRONG' || tag === 'B') {
+      return `**${innerContent()}**`;
     }
 
-    if (el.tagName === 'EM' || el.tagName === 'I') {
-      return `*${Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('')}*`;
+    if (tag === 'EM' || tag === 'I') {
+      return `*${innerContent()}*`;
     }
 
-    if (el.tagName === 'DEL' || el.tagName === 'S' || el.tagName === 'STRIKE') {
-      return `~~${Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('')}~~`;
+    if (['DEL', 'S', 'STRIKE'].includes(tag)) {
+      return `~~${innerContent()}~~`;
     }
 
-    if (el.tagName === 'A') {
+    if (tag === 'A') {
       const href = el.getAttribute('href') || '';
-      const title = Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('');
-      return `[${title}](${href})`;
+      return `[${innerContent()}](${href})`;
     }
 
-    if (el.tagName === 'IMG') {
+    if (tag === 'IMG') {
       const alt = el.getAttribute('alt') || '';
       const src = el.getAttribute('src') || '';
       return `![${alt}](${src})`;
     }
 
-    if (el.tagName === 'BR') {
-      return '  \n';
+    if (tag === 'BR') return '  \n';
+    if (tag === 'HR') return '\n---\n';
+
+    if (tag === 'BLOCKQUOTE') {
+      const quote = innerContent().split('\n').map(line => '> ' + line).join('\n');
+      return `\n${quote}\n`;
     }
 
-    if (el.tagName === 'HR') {
-      return '\n---\n';
-    }
-
-    if (el.tagName === 'BLOCKQUOTE') {
-      const quoteContent = Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('');
-      const quoted = quoteContent.split('\n').map(line => line ? '> ' + line : '> ').join('\n');
-      return `\n${quoted}\n`;
-    }
-
-    if (el.tagName === 'UL' || el.tagName === 'OL') {
-      let markdown = '\n';
+    if (tag === 'UL' || tag === 'OL') {
       let index = 1;
-      Array.from(el.children).forEach(li => {
-        if (li.tagName !== 'LI') return;
-
+      return '\n' + Array.from(el.children).map(li => {
+        if (li.tagName !== 'LI') return '';
         const indent = '  '.repeat(listLevel);
-        let prefix = el.tagName === 'UL' ? '- ' : `${index}. `;
-        index++;
-
-        const liContent = Array.from(li.childNodes).map(child => htmlToMarkdown(child, listLevel + 1)).join('');
-
-        let liText = liContent.replace(/\n/g, '\n' + indent + '  ');
-
-        markdown += indent + prefix + liText + '\n';
-      });
-      return markdown + '\n';
+        const prefix = tag === 'UL' ? '- ' : `${index++}. `;
+        let content = htmlToMarkdown(li, listLevel + 1).trim();
+        content = content.replace(/\n/g, '\n' + indent + '  ');
+        return `${indent}${prefix}${content}`;
+      }).join('\n') + '\n';
     }
 
-    if (el.tagName === 'TABLE') {
+    if (tag === 'TABLE') {
       const rows = Array.from(el.querySelectorAll('tr'));
       if (rows.length === 0) return '';
-
-      const headers = Array.from(rows[0].querySelectorAll('th,td')).map(th => htmlToMarkdown(th, listLevel).trim());
+      const headers = Array.from(rows[0].children).map(th => htmlToMarkdown(th, listLevel).trim());
       const aligns = headers.map(() => '---');
-
-      let mdTable = '\n| ' + headers.join(' | ') + ' |\n';
-      mdTable += '| ' + aligns.join(' | ') + ' |\n';
-
+      let md = '\n| ' + headers.join(' | ') + ' |\n';
+      md += '| ' + aligns.join(' | ') + ' |\n';
       for (let i = 1; i < rows.length; i++) {
-        const cols = Array.from(rows[i].querySelectorAll('td,th')).map(td => htmlToMarkdown(td, listLevel).trim());
-        mdTable += '| ' + cols.join(' | ') + ' |\n';
+        const cols = Array.from(rows[i].children).map(td => htmlToMarkdown(td, listLevel).trim());
+        md += '| ' + cols.join(' | ') + ' |\n';
       }
-      return mdTable + '\n';
+      return md + '\n';
     }
 
-    if (blockTags.has(el.tagName)) {
-      const inner = Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('');
-      return inner + '\n\n';
+    if (blockTags.has(tag)) {
+      const inner = innerContent().trim();
+      return inner ? inner + '\n\n' : '';
     }
 
-    return Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('');
+    return innerContent();
+
+    function innerContent() {
+      return Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('').trim();
+    }
   }
 
   function getContent() {
@@ -134,19 +117,14 @@ function exportChatGPTMarkdown() {
     messages.forEach((msg, index) => {
       const role = msg.getAttribute('data-message-author-role');
       const prefix = role === 'user' ? '### User' : '### ChatGPT';
-
-      let contentEl = null;
-      if (role === 'user') {
-        contentEl = msg.querySelector('.whitespace-pre-wrap');
-      } else if (role === 'assistant') {
-        contentEl = msg.querySelector('.markdown.prose');
-      }
+      let contentEl = role === 'user'
+        ? msg.querySelector('.whitespace-pre-wrap')
+        : msg.querySelector('.markdown.prose');
 
       if (!contentEl) return;
 
-      const markdown = htmlToMarkdown(contentEl);
-
-      result += `${prefix} Message ${index + 1}\n\n${markdown}\n---\n\n`;
+      const markdown = htmlToMarkdown(contentEl).trim();
+      result += `${prefix} Message ${index + 1}\n\n${markdown}\n\n---\n\n`;
     });
 
     return result || 'No conversation content found.';
