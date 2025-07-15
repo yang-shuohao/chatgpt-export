@@ -25,37 +25,36 @@ function exportChatGPTMarkdown() {
     if (!el) return '';
 
     const blockTags = new Set(['P', 'DIV', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'MAIN']);
-    const tableTags = new Set(['TABLE', 'THEAD', 'TBODY', 'TR']);
 
     if (el.nodeType === Node.TEXT_NODE) {
-      return escapeMarkdown(el.textContent.trim());
+      return escapeMarkdown(el.textContent);
     }
 
     const tag = el.tagName;
 
     if (tag === 'PRE') {
       const codeEl = el.querySelector('code');
-      const codeText = codeEl ? codeEl.textContent : el.textContent;
+      const codeText = codeEl ? codeEl.textContent.trim() : el.textContent.trim();
       const langClass = codeEl ? [...codeEl.classList].find(c => c.startsWith('language-')) : '';
       const lang = langClass ? langClass.replace('language-', '') : '';
-      return `\n\`\`\`${lang}\n${codeText.trim()}\n\`\`\`\n`;
+      return `\n\`\`\`${lang}\n${codeText}\n\`\`\`\n`;
     }
 
     if (tag === 'STRONG' || tag === 'B') {
-      return `**${innerContent()}**`;
+      return `**${inner()}**`;
     }
 
     if (tag === 'EM' || tag === 'I') {
-      return `*${innerContent()}*`;
+      return `*${inner()}*`;
     }
 
     if (['DEL', 'S', 'STRIKE'].includes(tag)) {
-      return `~~${innerContent()}~~`;
+      return `~~${inner()}~~`;
     }
 
     if (tag === 'A') {
       const href = el.getAttribute('href') || '';
-      return `[${innerContent()}](${href})`;
+      return `[${inner()}](${href})`;
     }
 
     if (tag === 'IMG') {
@@ -68,7 +67,7 @@ function exportChatGPTMarkdown() {
     if (tag === 'HR') return '\n---\n';
 
     if (tag === 'BLOCKQUOTE') {
-      const quote = innerContent().split('\n').map(line => '> ' + line).join('\n');
+      const quote = inner().split('\n').map(line => '> ' + line).join('\n');
       return `\n${quote}\n`;
     }
 
@@ -99,35 +98,40 @@ function exportChatGPTMarkdown() {
     }
 
     if (blockTags.has(tag)) {
-      const inner = innerContent().trim();
-      return inner ? inner + '\n\n' : '';
+      const content = inner().trim();
+      return content ? content + '\n\n' : '';
     }
 
-    return innerContent();
+    return inner();
 
-    function innerContent() {
-      return Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('').trim();
+    function inner() {
+      return Array.from(el.childNodes).map(child => htmlToMarkdown(child, listLevel)).join('');
     }
   }
 
   function getContent() {
     const messages = document.querySelectorAll('[data-message-author-role]');
-    let result = '';
+    const blocks = [];
 
     messages.forEach((msg, index) => {
       const role = msg.getAttribute('data-message-author-role');
       const prefix = role === 'user' ? '### User' : '### ChatGPT';
-      let contentEl = role === 'user'
-        ? msg.querySelector('.whitespace-pre-wrap')
-        : msg.querySelector('.markdown.prose');
+
+      let contentEl = null;
+      if (role === 'user') {
+        contentEl = msg.querySelector('.whitespace-pre-wrap');
+      } else if (role === 'assistant') {
+        contentEl = msg.querySelector('.markdown.prose');
+      }
 
       if (!contentEl) return;
 
       const markdown = htmlToMarkdown(contentEl).trim();
-      result += `${prefix} Message ${index + 1}\n\n${markdown}\n\n---\n\n`;
+      blocks.push(`${prefix} Message ${index + 1}\n\n${markdown}`);
     });
 
-    return result || 'No conversation content found.';
+    const result = blocks.join('\n\n---\n\n').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n');
+    return result.trim();
   }
 
   const content = getContent();

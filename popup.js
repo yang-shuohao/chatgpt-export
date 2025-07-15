@@ -16,9 +16,6 @@ function exportChatGPTMarkdown() {
     if (!el) return '';
 
     const blockTags = new Set(['P', 'DIV', 'SECTION', 'ARTICLE', 'HEADER', 'FOOTER', 'MAIN']);
-    const newlineTags = new Set(['BR', 'TR', 'HR']);
-    const listTags = new Set(['UL', 'OL']);
-    const tableTags = new Set(['TABLE', 'THEAD', 'TBODY', 'TR']);
 
     if (el.nodeType === Node.TEXT_NODE) {
       return escapeMarkdown(el.textContent);
@@ -26,14 +23,10 @@ function exportChatGPTMarkdown() {
 
     if (el.tagName === 'PRE') {
       const codeEl = el.querySelector('code');
-      if (codeEl) {
-        const langClass = [...codeEl.classList].find(c => c.startsWith('language-')) || '';
-        const lang = langClass.replace('language-', '');
-        const codeText = codeEl.textContent.trim();
-        return `\n\`\`\`${lang}\n${codeText}\n\`\`\`\n`;
-      } else {
-        return `\n\`\`\`\n${el.textContent.trim()}\n\`\`\`\n`;
-      }
+      const codeText = codeEl ? codeEl.textContent.trim() : el.textContent.trim();
+      const langClass = codeEl ? [...codeEl.classList].find(c => c.startsWith('language-')) : '';
+      const lang = langClass ? langClass.replace('language-', '') : '';
+      return `\n\`\`\`${lang}\n${codeText}\n\`\`\`\n`;
     }
 
     if (el.tagName === 'STRONG' || el.tagName === 'B') {
@@ -135,12 +128,16 @@ function exportChatGPTMarkdown() {
       if (!contentEl) return;
 
       const markdown = htmlToMarkdown(contentEl).trim();
-      result += `${prefix} Message ${index + 1}\n\n${markdown}\n\n---\n\n`;
+      result += `${prefix} Message ${index + 1}\n\n${markdown}`;
+
+      if (index !== messages.length - 1) {
+        result += `\n\n---\n\n`; // 中间加分隔线
+      }
     });
 
-    result = result.replace(/[ \t]+\n/g, '\n');      // 去掉行尾多余空格
-    result = result.replace(/\n{3,}/g, '\n\n');       // 合并多个空行为两个
-    return result.trim();
+    result = result.replace(/[ \t]+\n/g, '\n');     // 去除行尾空格
+    result = result.replace(/\n{3,}/g, '\n\n');     // 多余空行合并
+    return result.trim();                           // 去掉首尾空白
   }
 
   const content = getContent();
